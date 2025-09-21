@@ -1,10 +1,32 @@
 import os
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from contextlib import asynccontextmanager
 import uvicorn
 
-app = FastAPI(title="Photo Sharing App", description="A FastAPI application with DynamoDB integration for photo sharing")
+from database import db_service
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("Initializing application...")
+    try:
+        await db_service.create_table_if_not_exists()
+        print("Database initialization complete")
+    except Exception as e:
+        print(f"Database initialization failed: {str(e)}")
+        print("Application may have limited functionality")
+    yield
+    # Shutdown
+    print("Application shutdown")
+
+app = FastAPI(
+    title="Photo Sharing App", 
+    description="A FastAPI application with DynamoDB integration for photo sharing",
+    lifespan=lifespan
+)
 
 # Serve static files
 os.makedirs("static", exist_ok=True)
