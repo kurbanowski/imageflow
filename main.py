@@ -3,10 +3,15 @@ import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
 import uvicorn
 
 from database import db_service
+from routers import photos, comments, share_links, auth
+from middleware.error_handler import error_handler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,8 +30,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Photo Sharing App", 
     description="A FastAPI application with DynamoDB integration for photo sharing",
+    version="1.0.0",
     lifespan=lifespan
 )
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5000"],  # Development origins
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+# Add error handlers
+app.add_exception_handler(HTTPException, error_handler.http_exception_handler)
+app.add_exception_handler(StarletteHTTPException, error_handler.http_exception_handler)
+app.add_exception_handler(RequestValidationError, error_handler.validation_exception_handler)
+app.add_exception_handler(Exception, error_handler.general_exception_handler)
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(photos.router)
+app.include_router(comments.router)
+app.include_router(share_links.router)
 
 # Serve static files
 os.makedirs("static", exist_ok=True)

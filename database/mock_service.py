@@ -80,6 +80,15 @@ class MockDynamoDBService:
         """Get photo by ID"""
         return self.data.get(f"PHOTO#{photo_id}")
     
+    async def update_photo(self, photo_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update photo information"""
+        photo_key = f"PHOTO#{photo_id}"
+        if photo_key in self.data:
+            self.data[photo_key].update(updates)
+            self.data[photo_key]['updated_at'] = datetime.now().isoformat()
+            return self.data[photo_key]
+        raise KeyError(f"Photo {photo_id} not found")
+    
     async def list_user_photos(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """List photos by user"""
         photos = []

@@ -246,6 +246,45 @@ class DynamoDBService:
             )
             return response.get('Item')
     
+    async def update_photo(self, photo_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update photo information"""
+        # Whitelist allowed fields to prevent unauthorized updates
+        allowed_fields = {'title', 'description', 'metadata'}
+        filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+        
+        if not filtered_updates:
+            # If no valid updates, just return the current photo
+            photo = await self.get_photo(photo_id)
+            if not photo:
+                raise ValueError(f"Photo {photo_id} not found")
+            return photo
+        
+        filtered_updates['updated_at'] = datetime.now().isoformat()
+        
+        update_expression = "SET "
+        expression_values = {}
+        expression_names = {}
+        
+        for key, value in filtered_updates.items():
+            attr_name = f"#{key}"
+            attr_value = f":{key}"
+            update_expression += f"{attr_name} = {attr_value}, "
+            expression_names[attr_name] = key
+            expression_values[attr_value] = value
+        
+        update_expression = update_expression.rstrip(", ")
+        
+        async with self.get_resource() as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            response = await table.update_item(
+                Key={'PK': f"PHOTO#{photo_id}", 'SK': f"PHOTO#{photo_id}"},
+                UpdateExpression=update_expression,
+                ExpressionAttributeNames=expression_names,
+                ExpressionAttributeValues=expression_values,
+                ReturnValues='ALL_NEW'
+            )
+            return response['Attributes']
+    
     async def list_user_photos(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """List photos by user"""
         async with self.get_resource() as dynamodb:
