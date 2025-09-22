@@ -289,38 +289,65 @@ class DynamoDBService:
         """List photos by user"""
         async with self.get_resource() as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            # Use scan with filter for user photos (works without GSI1)
-            response = await table.scan(
-                FilterExpression='begins_with(PK, :photo_prefix) AND #uid = :user_id',
-                ExpressionAttributeNames={'#uid': 'user_id'},
-                ExpressionAttributeValues={
-                    ':photo_prefix': 'PHOTO#',
-                    ':user_id': user_id
-                },
-                Limit=limit
-            )
             
-            # Sort by created_at in reverse order (most recent first)
-            items = response.get('Items', [])
-            items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-            return items[:limit]
+            try:
+                # Try using GSI1 first (if it exists)
+                response = await table.query(
+                    IndexName='GSI1',
+                    KeyConditionExpression=Key('GSI1PK').eq(f"USER#{user_id}") & Key('GSI1SK').begins_with('PHOTO#'),
+                    ScanIndexForward=False,  # Most recent first
+                    Limit=limit
+                )
+                return response.get('Items', [])
+            except Exception as e:
+                print(f"GSI1 query failed: {str(e)}, falling back to scan")
+                # Fallback to scan if GSI1 doesn't exist or fails
+                response = await table.scan(
+                    FilterExpression='begins_with(PK, :photo_prefix) AND #uid = :user_id AND attribute_exists(entity_type) AND entity_type = :entity_type',
+                    ExpressionAttributeNames={'#uid': 'user_id'},
+                    ExpressionAttributeValues={
+                        ':photo_prefix': 'PHOTO#',
+                        ':user_id': user_id,
+                        ':entity_type': 'PHOTO'
+                    },
+                    Limit=limit
+                )
+                
+                # Sort by created_at in reverse order (most recent first)
+                items = response.get('Items', [])
+                items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                return items[:limit]
     
     async def list_recent_photos(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List most recent photos across all users"""
         async with self.get_resource() as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            # Use scan since the existing table may not have GSI2
-            # In production, consider adding pagination token for large datasets
-            response = await table.scan(
-                FilterExpression='begins_with(PK, :photo_prefix)',
-                ExpressionAttributeValues={':photo_prefix': 'PHOTO#'},
-                Limit=limit
-            )
             
-            # Sort by created_at in reverse order (most recent first)
-            items = response.get('Items', [])
-            items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-            return items[:limit]
+            try:
+                # Try using GSI2 first (if it exists)
+                response = await table.query(
+                    IndexName='GSI2',
+                    KeyConditionExpression=Key('GSI2PK').eq('PHOTOS'),
+                    ScanIndexForward=False,  # Most recent first
+                    Limit=limit
+                )
+                return response.get('Items', [])
+            except Exception as e:
+                print(f"GSI2 query failed: {str(e)}, falling back to scan")
+                # Fallback to scan if GSI2 doesn't exist or fails
+                response = await table.scan(
+                    FilterExpression='begins_with(PK, :photo_prefix) AND attribute_exists(entity_type) AND entity_type = :entity_type',
+                    ExpressionAttributeValues={
+                        ':photo_prefix': 'PHOTO#',
+                        ':entity_type': 'PHOTO'
+                    },
+                    Limit=limit
+                )
+                
+                # Sort by created_at in reverse order (most recent first)
+                items = response.get('Items', [])
+                items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+                return items[:limit]
     
     # Comment operations
     async def create_comment(self, comment_data: Dict[str, Any]) -> Dict[str, Any]:
