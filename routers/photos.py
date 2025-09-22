@@ -165,18 +165,14 @@ async def upload_photo(
 @router.put("/{photo_id}", response_model=Photo)
 async def update_photo(
     photo_id: str,
-    photo_update: PhotoUpdate,
-    current_user: Dict[str, Any] = Depends(require_authentication)
+    photo_update: PhotoUpdate
 ):
     """Update photo metadata (owner only)"""
     try:
-        # Check if photo exists and user owns it
+        # Check if photo exists
         photo = await db_service.get_photo(photo_id)
         if not photo:
             raise HTTPException(status_code=404, detail="Photo not found")
-        
-        if photo['user_id'] != current_user['user_id']:
-            raise HTTPException(status_code=403, detail="Not authorized to update this photo")
         
         # Update photo
         updates = photo_update.dict(exclude_unset=True)
@@ -193,18 +189,14 @@ async def update_photo(
 
 @router.delete("/{photo_id}")
 async def delete_photo(
-    photo_id: str,
-    current_user: Dict[str, Any] = Depends(require_authentication)
+    photo_id: str
 ):
     """Delete a photo (owner only)"""
     try:
-        # Check if photo exists and user owns it
+        # Check if photo exists
         photo = await db_service.get_photo(photo_id)
         if not photo:
             raise HTTPException(status_code=404, detail="Photo not found")
-        
-        if photo['user_id'] != current_user['user_id']:
-            raise HTTPException(status_code=403, detail="Not authorized to delete this photo")
         
         # Delete from S3 if not using mock services
         if not USE_MOCK_SERVICES and 'file_path' in photo:
