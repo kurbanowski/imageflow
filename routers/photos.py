@@ -165,6 +165,8 @@ async def upload_photo(
             # Generate the shareable URL
             share_url = f"/api/share/{share_link['link_id']}"
             
+            print(f"Successfully created share link: {share_link['link_id']}")
+            
             return {
                 "photo": photo,
                 "message": "Photo uploaded successfully",
@@ -178,11 +180,13 @@ async def upload_photo(
             }
             
         except Exception as e:
-            print(f"Warning: Failed to create share link: {str(e)}")
+            print(f"Error: Failed to create share link: {str(e)}")
+            import traceback
+            traceback.print_exc()
             # Still return success for photo upload even if share link creation fails
             return {
                 "photo": photo,
-                "message": "Photo uploaded successfully (share link creation failed)",
+                "message": f"Photo uploaded successfully (share link creation failed: {str(e)})",
                 "file_url": file_url
             }
         

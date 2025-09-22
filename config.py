@@ -32,8 +32,18 @@ ALLOWED_IMAGE_TYPES = {
 REPLIT_AUTH_DOMAIN = os.getenv("REPL_ID", "") + ".id.replit.com"
 JWT_ISSUER_URL = f"https://{REPLIT_AUTH_DOMAIN}"
 
-# Use mock services in development when AWS credentials are not available
-USE_MOCK_SERVICES = ENVIRONMENT == "development" and not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
+# Use mock services when AWS credentials are not available
+try:
+    import boto3
+    # Test if we can create a session (credentials available)
+    session = boto3.Session()
+    credentials = session.get_credentials()
+    if credentials is None:
+        USE_MOCK_SERVICES = True
+    else:
+        USE_MOCK_SERVICES = False
+except Exception:
+    USE_MOCK_SERVICES = True
 
 # Object Storage Configuration (from Replit integration - fallback)
 PRIVATE_OBJECT_DIR = os.getenv("PRIVATE_OBJECT_DIR", "")
