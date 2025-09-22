@@ -12,6 +12,13 @@ import uvicorn
 from database import db_service
 from routers import photos, comments, share_links, auth
 from middleware.error_handler import error_handler
+from config import USE_MOCK_SERVICES, ENVIRONMENT
+from services.s3_service import s3_service
+
+if USE_MOCK_SERVICES:
+    print("Using mock DynamoDB service for development")
+else:
+    print(f"Using production AWS services in {ENVIRONMENT} environment")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +30,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Database initialization failed: {str(e)}")
         print("Application may have limited functionality")
+    
+    # Check S3 bucket access if not using mock services
+    if not USE_MOCK_SERVICES:
+        try:
+            bucket_exists = await s3_service.check_bucket_exists()
+            if bucket_exists:
+                print("S3 bucket access verified")
+            else:
+                print("Warning: S3 bucket access failed - file uploads may not work")
+        except Exception as e:
+            print(f"Warning: S3 service check failed: {str(e)}")
+    
     yield
     # Shutdown
     print("Application shutdown")

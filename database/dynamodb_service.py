@@ -414,6 +414,19 @@ class DynamoDBService:
                     ':timestamp': datetime.now().isoformat()
                 }
             )
+    
+    async def delete_photo(self, photo_id: str) -> bool:
+        """Delete a photo record from DynamoDB"""
+        try:
+            async with self.get_resource() as dynamodb:
+                table = await dynamodb.Table(self.table_name)
+                await table.delete_item(
+                    Key={'PK': f"PHOTO#{photo_id}", 'SK': f"PHOTO#{photo_id}"}
+                )
+                return True
+        except Exception as e:
+            print(f"Failed to delete photo from database: {str(e)}")
+            return False
 
 # Global DynamoDB service instance
 dynamodb_service = DynamoDBService()
