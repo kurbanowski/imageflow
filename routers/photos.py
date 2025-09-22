@@ -153,11 +153,38 @@ async def upload_photo(
         
         photo = await db_service.create_photo(photo_data)
         
-        return {
-            "photo": photo,
-            "message": "Photo uploaded successfully",
-            "file_url": file_url
-        }
+        # Automatically create a shareable link for the uploaded photo
+        try:
+            share_link_data = {
+                'photo_id': photo['photo_id'],
+                'user_id': user_id,
+                'expiration_days': 30  # Default 30 days expiration
+            }
+            share_link = await db_service.create_shareable_link(share_link_data)
+            
+            # Generate the shareable URL
+            share_url = f"/api/share/{share_link['link_id']}"
+            
+            return {
+                "photo": photo,
+                "message": "Photo uploaded successfully",
+                "file_url": file_url,
+                "share_link": {
+                    "link_id": share_link['link_id'],
+                    "share_url": share_url,
+                    "expires_at": share_link['expires_at'],
+                    "full_url": f"http://your-domain.com{share_url}"  # You can update this with your actual domain
+                }
+            }
+            
+        except Exception as e:
+            print(f"Warning: Failed to create share link: {str(e)}")
+            # Still return success for photo upload even if share link creation fails
+            return {
+                "photo": photo,
+                "message": "Photo uploaded successfully (share link creation failed)",
+                "file_url": file_url
+            }
         
     except HTTPException:
         raise

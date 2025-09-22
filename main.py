@@ -224,7 +224,23 @@ async def read_root():
                         </button>
                     `;
                     
-                    alert('Photo uploaded successfully!');
+                    // Show success with share link if available
+                    let message = 'Photo uploaded successfully!';
+                    if (result.share_link) {
+                        message += `\\n\\nShareable link: ${window.location.origin}${result.share_link.share_url}`;
+                        
+                        // Copy to clipboard
+                        const shareUrl = window.location.origin + result.share_link.share_url;
+                        navigator.clipboard.writeText(shareUrl).then(() => {
+                            message += '\\n(Link copied to clipboard!)';
+                            alert(message);
+                        }).catch(() => {
+                            alert(message);
+                        });
+                    } else {
+                        alert(message);
+                    }
+                    
                     loadRecentPhotos(); // Refresh the photos list
                     
                 } catch (error) {
