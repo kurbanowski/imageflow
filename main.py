@@ -182,9 +182,86 @@ async def read_root():
                     return;
                 }
                 
-                // This will be implemented later with actual upload functionality
-                alert('Upload functionality will be implemented with DynamoDB integration');
+                if (!title.trim()) {
+                    alert('Please enter a photo title');
+                    return;
+                }
+                
+                // Disable button and show loading
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = 'Uploading...';
+                
+                try {
+                    // Create form data for upload
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('title', title);
+                    formData.append('description', description);
+                    
+                    // Upload to API
+                    const response = await fetch('/api/photos/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Upload failed');
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Success - clear form and refresh photos
+                    document.getElementById('photoTitle').value = '';
+                    document.getElementById('photoDescription').value = '';
+                    fileInput.value = '';
+                    uploadArea.innerHTML = `
+                        <i class="bi bi-cloud-upload" style="font-size: 2rem;"></i>
+                        <p>Drag & drop your photos here or click to browse</p>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            Choose Photos
+                        </button>
+                    `;
+                    
+                    alert('Photo uploaded successfully!');
+                    loadRecentPhotos(); // Refresh the photos list
+                    
+                } catch (error) {
+                    alert('Upload failed: ' + error.message);
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = 'Upload Photo';
+                }
             });
+            
+            // Load recent photos
+            async function loadRecentPhotos() {
+                try {
+                    const response = await fetch('/api/photos/');
+                    if (response.ok) {
+                        const photos = await response.json();
+                        const photosList = document.getElementById('photosList');
+                        
+                        if (photos.length === 0) {
+                            photosList.innerHTML = '<p class="text-muted">No photos uploaded yet.</p>';
+                        } else {
+                            photosList.innerHTML = photos.slice(0, 5).map(photoData => `
+                                <div class="mb-2 p-2 border rounded">
+                                    <h6 class="mb-1">${photoData.photo.title}</h6>
+                                    <small class="text-muted">by ${photoData.user.first_name || 'Unknown'}</small>
+                                    <br><small class="text-muted">${new Date(photoData.photo.created_at).toLocaleDateString()}</small>
+                                </div>
+                            `).join('');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to load photos:', error);
+                }
+            }
+            
+            // Load photos on page load
+            loadRecentPhotos();
         </script>
     </body>
     </html>
