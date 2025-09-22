@@ -111,6 +111,9 @@ async def upload_photo(
                 detail=f"File too large. Maximum size: {format_file_size(max_size_bytes)}"
             )
         
+        # Set user_id for demo purposes (no authentication required)
+        user_id = current_user['user_id'] if current_user else 'demo-user'
+        
         # Upload to S3 or use mock service in development
         if USE_MOCK_SERVICES:
             # Mock implementation for development
@@ -133,8 +136,7 @@ async def upload_photo(
                 print(f"Warning: Failed to generate presigned URL: {str(e)}")
                 file_url = upload_result['file_url']  # Fallback to direct URL
         
-        # Create photo record (use demo user if no auth)
-        user_id = current_user['user_id'] if current_user else 'demo-user'
+        # Create photo record
         photo_data = {
             'user_id': user_id,
             'title': title,
