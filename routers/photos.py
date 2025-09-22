@@ -88,7 +88,7 @@ async def upload_photo(
     title: str = Form(...),
     description: str = Form(""),
     file: UploadFile = File(...),
-    current_user: Dict[str, Any] = Depends(require_authentication)
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
 ):
     """Upload a new photo (requires authentication)"""
     try:
@@ -114,13 +114,13 @@ async def upload_photo(
         # Upload to S3 or use mock service in development
         if USE_MOCK_SERVICES:
             # Mock implementation for development
-            file_path = f"/uploads/{current_user['user_id']}/{file.filename}"
+            file_path = f"/uploads/{user_id}/{file.filename}"
             file_url = file_path
         else:
             # Real S3 upload
             upload_result = await s3_service.upload_file(
                 file_obj=file.file,
-                user_id=current_user['user_id'],
+                user_id=user_id,
                 original_filename=file.filename,
                 content_type=get_content_type(file.filename)
             )
@@ -133,9 +133,10 @@ async def upload_photo(
                 print(f"Warning: Failed to generate presigned URL: {str(e)}")
                 file_url = upload_result['file_url']  # Fallback to direct URL
         
-        # Create photo record
+        # Create photo record (use demo user if no auth)
+        user_id = current_user['user_id'] if current_user else 'demo-user'
         photo_data = {
-            'user_id': current_user['user_id'],
+            'user_id': user_id,
             'title': title,
             'description': description,
             'file_path': file_path,

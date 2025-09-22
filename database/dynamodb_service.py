@@ -289,25 +289,38 @@ class DynamoDBService:
         """List photos by user"""
         async with self.get_resource() as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.query(
-                IndexName='GSI1',
-                KeyConditionExpression=Key('GSI1PK').eq(f"USER#{user_id}") & Key('GSI1SK').begins_with('PHOTO#'),
-                ScanIndexForward=False,  # Most recent first
+            # Use scan with filter for user photos (works without GSI1)
+            response = await table.scan(
+                FilterExpression='begins_with(PK, :photo_prefix) AND #uid = :user_id',
+                ExpressionAttributeNames={'#uid': 'user_id'},
+                ExpressionAttributeValues={
+                    ':photo_prefix': 'PHOTO#',
+                    ':user_id': user_id
+                },
                 Limit=limit
             )
-            return response.get('Items', [])
+            
+            # Sort by created_at in reverse order (most recent first)
+            items = response.get('Items', [])
+            items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            return items[:limit]
     
     async def list_recent_photos(self, limit: int = 20) -> List[Dict[str, Any]]:
         """List most recent photos across all users"""
         async with self.get_resource() as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.query(
-                IndexName='GSI2',
-                KeyConditionExpression=Key('GSI2PK').eq('PHOTOS'),
-                ScanIndexForward=False,  # Most recent first
+            # Use scan since the existing table may not have GSI2
+            # In production, consider adding pagination token for large datasets
+            response = await table.scan(
+                FilterExpression='begins_with(PK, :photo_prefix)',
+                ExpressionAttributeValues={':photo_prefix': 'PHOTO#'},
                 Limit=limit
             )
-            return response.get('Items', [])
+            
+            # Sort by created_at in reverse order (most recent first)
+            items = response.get('Items', [])
+            items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            return items[:limit]
     
     # Comment operations
     async def create_comment(self, comment_data: Dict[str, Any]) -> Dict[str, Any]:
